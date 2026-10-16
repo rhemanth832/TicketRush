@@ -47,6 +47,7 @@ cd /d "%USERPROFILE%\Downloads\TicketRush-main"
 notepad .env
 ```
 Choose Yes if Notepad asks to create the file.
+
 2. Paste these local-development settings:
 ```doenv
 JWT_SECRET=local-only-change-this-jwt-secret-32-chars-minimum
@@ -60,7 +61,8 @@ CORS_ORIGIN=http://localhost:4000
 PAYMENT_MODE=sandbox
 ```
 
-Save the filename exactly as .env, choosing All Files as the file type. It belongs beside docker-compose.yml, where Compose reads its environment settings. Docker Docs
+Save the filename exactly as .env, choosing All Files as the file type. It belongs beside docker-compose.yml, where Compose reads its environment settings.
+
 3. Close Notepad and run:
 ```cmd
 docker compose config --quiet && docker compose up --build -d
