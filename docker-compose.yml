@@ -1,0 +1,79 @@
+x-app: &app
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  image: ticketrush:local
+  environment: &environment
+    NODE_ENV: production
+    DATABASE_URL: postgresql://${POSTGRES_USER:-ticketrush}:${POSTGRES_PASSWORD:-ticketrush}@postgres:5432/${POSTGRES_DB:-ticketrush}
+    REDIS_URL: redis://redis:6379
+    JWT_SECRET: ${JWT_SECRET:?Copy .env.example to .env first}
+    TICKET_SECRET: ${TICKET_SECRET:?Set TICKET_SECRET in .env}
+    ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ticketrush.local}
+    ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+    CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4000}
+    SMTP_HOST: mailpit
+    SMTP_PORT: 1025
+    SMTP_FROM: TicketRush <tickets@ticketrush.local>
+    PAYMENT_MODE: sandbox
+    RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+    RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+    RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+  init: true
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ticketrush}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketrush}
+      POSTGRES_DB: ${POSTGRES_DB:-ticketrush}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["127.0.0.1:8025:8025", "127.0.0.1:1025:1025"]
+  init-db:
+    <<: *app
+    command: ["sh", "-c", "node build/migrate.js && node build/seed.js"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    restart: "no"
+  api:
+    <<: *app
+    volumes: ["event-images:/app/backend/uploads"]
+    ports: ["127.0.0.1:4000:4000"]
+    depends_on:
+      init-db: {condition: service_completed_successfully}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  worker:
+    <<: *app
+    command: ["node", "build/worker.js"]
+    depends_on:
+      init-db: {condition: service_completed_successfully}
+      mailpit: {condition: service_started}
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  redis-data:
+  event-images:

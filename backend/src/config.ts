@@ -1,0 +1,5 @@
+import 'dotenv/config';
+import { z } from 'zod';
+const schema=z.object({NODE_ENV:z.enum(['development','test','production']).default('development'),PORT:z.coerce.number().default(4000),DATABASE_URL:z.string().default('postgresql://ticketrush:ticketrush@localhost:5432/ticketrush'),REDIS_URL:z.string().default('redis://localhost:6379'),JWT_SECRET:z.string().min(32),TICKET_SECRET:z.string().min(32),CORS_ORIGIN:z.string().default('http://localhost:4000'),SMTP_HOST:z.string().default('localhost'),SMTP_PORT:z.coerce.number().default(1025),SMTP_USER:z.string().optional(),SMTP_PASSWORD:z.string().optional(),SMTP_FROM:z.string().default('TicketRush <tickets@ticketrush.local>'),ADMIN_EMAIL:z.string().email().default('admin@ticketrush.local'),ADMIN_PASSWORD:z.string().min(12),PAYMENT_MODE:z.enum(['simulated','sandbox','razorpay']).default('sandbox'),RAZORPAY_KEY_ID:z.string().optional(),RAZORPAY_KEY_SECRET:z.string().optional(),RAZORPAY_WEBHOOK_SECRET:z.string().optional()});
+export const config=schema.parse(process.env);
+export const HOLD_MS=5*60*1000;

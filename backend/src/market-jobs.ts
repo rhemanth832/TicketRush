@@ -1,0 +1,13 @@
+import { tx, pool, getOrderQueue } from './infra';
+import { config } from './config';
+import nodemailer from 'nodemailer';
+import QRCode from 'qrcode';
+import { createHmac } from 'node:crypto';
+const escape = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+export async function dispatchMarketOutbox() { await tx(async (c) => { const { rows } = await c.query('SELECT * FROM market_outbox WHERE published_at IS NULL ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 50'); for (const row of rows) {
+    await getOrderQueue().add('market-email', { orderId: row.order_id }, { jobId: 'market-' + row.id });
+    await c.query('UPDATE market_outbox SET published_at=now() WHERE id=$1', [row.id]);
+} }); }
+export async function sendMarketEmail(orderId: string) { await tx(async (c) => { await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', ['market-email:' + orderId]); const sent = await c.query('SELECT 1 FROM market_email_deliveries WHERE order_id=$1', [orderId]); if (sent.rowCount)
+    return; const result = await c.query("SELECT document FROM market_orders WHERE id=$1 AND status='confirmed'", [orderId]); if (!result.rowCount)
+    return; const o = JSON.parse(result.rows[0].document); const attachments = await Promise.all(o.seats.map(async (s: any, i: number) => ({ filename: 'TicketRush-' + s.label + '.png', cid: 'seat-' + i, content: await QRCode.toBuffer(s.ticketId + ':' + createHmac('sha256', config.TICKET_SECRET).update(s.ticketId).digest('hex')) }))); const transport = nodemailer.createTransport({ host: config.SMTP_HOST, port: config.SMTP_PORT, secure: config.SMTP_PORT === 465, ...(config.SMTP_USER ? { auth: { user: config.SMTP_USER, pass: config.SMTP_PASSWORD } } : {}) }); await transport.sendMail({ from: config.SMTP_FROM, to: o.contact.email, messageId: `<market-${orderId}@ticketrush.local>`, subject: `You’re going: ${o.event.title}`, text: `Hi ${o.contact.name}, your tickets for ${o.event.title} are confirmed. Seats: ${o.seatLabels.join(', ')}. Venue: ${o.event.venue}. Date: ${o.event.startsAt}. ${o.event.isDemo ? 'Sample event. Not valid for admission.' : ''}`, html: `<h1>You’re going, ${escape(o.contact.name)}.</h1><h2>${escape(o.event.title)}</h2><p>${escape(o.event.venue)} · ${escape(o.event.startsAt)}</p>${o.seats.map((s: any, i: number) => `<p>Seat ${escape(s.label)}</p><img src="cid:seat-${i}" width="180" alt="Ticket QR code">`).join('')}<p>${o.event.isDemo ? 'Sample event. Not valid for admission.' : 'Your tickets are also available in your TicketRush account.'}</p>`, attachments }); await c.query('INSERT INTO market_email_deliveries(order_id) VALUES($1) ON CONFLICT DO NOTHING', [orderId]); }); }
