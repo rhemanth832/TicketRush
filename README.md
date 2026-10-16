@@ -75,7 +75,8 @@ Once the logs show TicketRush API listening on 4000, open:
 - Swagger: http://localhost:4000/docs
 - Email inbox: http://localhost:8025
 
-           ##OR
+  ## OR
+
 1. Extract the current project into `Downloads\TicketRush`. Open that folder in VS Code using **File → Open Folder**.
 2. Choose **Terminal → New Terminal**. Use the terminal dropdown to select **Command Prompt**. These commands use CMD syntax.
 3. Start Docker Desktop and wait for its engine to run. Then run:
