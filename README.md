@@ -41,6 +41,39 @@ The event editor includes a title, summary, description, category, tags, languag
 
 **Prerequisites:** VS Code and Docker Desktop running Linux containers with a working WSL 2 backend. This Docker path does not require Node.js on your laptop. See [Docker's Windows requirements](https://docs.docker.com/desktop/setup/install/windows-install/).
 
+1. Run in CMD:
+```cmd
+cd /d "%USERPROFILE%\Downloads\TicketRush-main"
+notepad .env
+```
+Choose Yes if Notepad asks to create the file.
+2. Paste these local-development settings:
+```doenv
+JWT_SECRET=local-only-change-this-jwt-secret-32-chars-minimum
+TICKET_SECRET=local-only-change-this-ticket-secret-32-chars-minimum
+ADMIN_EMAIL=admin@ticketrush.local
+ADMIN_PASSWORD=TicketRushLocal2026!
+POSTGRES_USER=ticketrush
+POSTGRES_PASSWORD=ticketrush
+POSTGRES_DB=ticketrush
+CORS_ORIGIN=http://localhost:4000
+PAYMENT_MODE=sandbox
+```
+
+Save the filename exactly as .env, choosing All Files as the file type. It belongs beside docker-compose.yml, where Compose reads its environment settings. Docker Docs
+3. Close Notepad and run:
+
+docker compose config --quiet && docker compose up --build -d
+```cmd
+docker compose ps -a
+docker compose logs -f init-db api worker
+```
+
+Once the logs show TicketRush API listening on 4000, open:
+- App: http://localhost:4000
+- Swagger: http://localhost:4000/docs
+- Email inbox: http://localhost:8025
+
 1. Extract the current project into `Downloads\TicketRush`. Open that folder in VS Code using **File → Open Folder**.
 2. Choose **Terminal → New Terminal**. Use the terminal dropdown to select **Command Prompt**. These commands use CMD syntax.
 3. Start Docker Desktop and wait for its engine to run. Then run:
